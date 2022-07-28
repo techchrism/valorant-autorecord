@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ttsc && node ./build/index.js"
+    "start": "ttsc && node ./build/index.js",
+    "build": "ttsc"
   },
   "keywords": [],
   "author": "techchrism",
@@ -17,6 +18,8 @@
   },
   "dependencies": {
     "dotenv": "^16.0.1",
+    "ee-ts": "^1.0.2",
+    "node-fetch": "^3.2.9",
     "obs-websocket-js": "^5.0.0"
   }
 }
