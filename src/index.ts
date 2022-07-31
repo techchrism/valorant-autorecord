@@ -2,6 +2,7 @@ import 'dotenv/config'
 import OBSWebSocket from 'obs-websocket-js'
 import {ValorantAPI} from './ValorantAPI.js'
 import {LockfileData, ValorantChatSessionResponse, ValorantEvent, ValorantExternalSessionsResponse} from './valorantTypes'
+import {loadConfig} from './config.js'
 import {WebSocket} from 'ws'
 
 async function asyncTimeout(delay: number) {
@@ -37,6 +38,8 @@ const preGamePrefix = '/riot-messaging-service/v1/message/ares-pregame/pregame/v
 const gameEndURI = '/riot-messaging-service/v1/message/ares-match-details/match-details/v1/matches'
 
 async function main() {
+    const config = await loadConfig()
+
     const val = new ValorantAPI()
     val.on('ready', async (lockfileData: LockfileData,
                            chatSession: ValorantChatSessionResponse,
@@ -84,6 +87,8 @@ async function main() {
                 } else if(data.uri.startsWith(matchCorePrefix)) {
                     if(gameID === null) {
                         const id = data.uri.substring(matchCorePrefix.length);
+                        // Another core game ID can be sent after the "match details" message
+                        // This check ensures  it's not interpreted as a game start
                         if(id !== previousGameID) {
                             gameID = id
                             onGameStart(gameID)
