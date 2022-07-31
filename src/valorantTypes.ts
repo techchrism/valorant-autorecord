@@ -46,3 +46,72 @@ export interface ValorantChatSessionResponse {
     resource: string
     state: string
 }
+
+export interface Presence {
+    actor: string
+    basic: string
+    details: string
+    game_name: string
+    game_tag: string
+    location: string
+    msg: string
+    name: string
+    patchline: string | null
+    pid: string
+    platform: string | null
+    private: string
+    privateJwt: string | null
+    product: string
+    puuid: string
+    region: string
+    resource: string
+    state: string
+    summary: string
+    time: number
+}
+
+export interface PrivatePresence {
+    isValid: boolean
+    sessionLoopState: string
+    partyOwnerSessionLoopState: string
+    customGameName: string
+    customGameTeam: string
+    partyOwnerMatchMap: string
+    partyOwnerMatchCurrentTeam: string
+    partyOwnerMatchScoreAllyTeam: number
+    partyOwnerMatchScoreEnemyTeam: number
+    partyOwnerProvisioningFlow: string
+    provisioningFlow: string
+    matchMap: string
+    partyId: string
+    isPartyOwner: boolean
+    partyState: string
+    partyAccessibility: string
+    maxPartySize: number
+    queueId: string
+    partyLFM: boolean
+    partyClientVersion: string
+    partySize: number
+    tournamentId: string
+    rosterId: string
+    partyVersion: number
+    queueEntryTime: string
+    playerCardId: string
+    playerTitleId: string
+    preferredLevelBorderId: string
+    accountLevel: number
+    competitiveTier: number
+    leaderboardPosition: number
+    isIdle: boolean
+}
+
+export interface ValorantEvent {
+    eventType: string
+    uri: string
+}
+
+export interface ValorantPresenceEvent extends ValorantEvent {
+    data: {
+        presences: Presence[]
+    }
+}
