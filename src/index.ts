@@ -1,12 +1,7 @@
 import 'dotenv/config'
 import OBSWebSocket from 'obs-websocket-js'
 import {ValorantAPI} from './ValorantAPI.js'
-import {
-    LockfileData, PrivatePresence,
-    ValorantChatSessionResponse,
-    ValorantEvent,
-    ValorantExternalSessionsResponse, ValorantPresenceEvent
-} from "./valorantTypes";
+import {LockfileData, ValorantChatSessionResponse, ValorantEvent, ValorantExternalSessionsResponse} from './valorantTypes'
 import {WebSocket} from 'ws'
 
 async function asyncTimeout(delay: number) {
@@ -25,15 +20,21 @@ async function runOBSTest() {
     await obs.disconnect()
 }
 
-async function onGameStart() {
-    console.log('Game started!')
+async function onPreGameStart(preGameID: string) {
+    console.log(`Pregame started: ${preGameID}`)
+}
+
+async function onGameStart(gameID: string) {
+    console.log(`Game started: ${gameID}`)
 }
 
 async function onGameEnd(gameID: string) {
     console.log(`Game ended: ${gameID}`)
 }
 
-const matchCorePrefix = '/riot-messaging-service/v1/message/ares-core-game/core-game/v1/matches/';
+const matchCorePrefix = '/riot-messaging-service/v1/message/ares-core-game/core-game/v1/matches/'
+const preGamePrefix = '/riot-messaging-service/v1/message/ares-pregame/pregame/v1/matches/'
+const gameEndURI = '/riot-messaging-service/v1/message/ares-match-details/match-details/v1/matches'
 
 async function main() {
     const val = new ValorantAPI()
@@ -48,8 +49,9 @@ async function main() {
             rejectUnauthorized: false
         });
 
-        let wasInGame = false
         let gameID: string | null = null
+        let preGameID: string | null = null
+        let previousGameID: string | null = null
 
         ws.on('close', () => {
             console.log('Disconnected from Valorant')
@@ -69,30 +71,29 @@ async function main() {
                 return;
             }
 
-            if(event === 'OnJsonApiEvent_chat_v4_presences') {
-                const presenceEvent = (data as ValorantPresenceEvent)
-                const ownPresence = presenceEvent.data.presences.find(presence => presence.pid === chatSession.pid)
-                if(ownPresence === undefined) return
-
-                const privateData = JSON.parse(Buffer.from(ownPresence.private, 'base64').toString('utf-8')) as PrivatePresence
-                const inGame = privateData.sessionLoopState === 'INGAME'
-
-                if(!inGame && wasInGame) {
-                    // Used to be in a game but is no longer in a game
-                    wasInGame = false
+            if(event === 'OnJsonApiEvent_riot-messaging-service_v1_message') {
+                if(data.uri === gameEndURI) {
                     if(gameID === null) {
                         console.warn('Game ended with null ID')
                     } else {
                         onGameEnd(gameID)
                     }
-                } else if(inGame && !wasInGame) {
-                    // Is now in a game
-                    wasInGame = true
-                    onGameStart()
-                }
-            } else if(event === 'OnJsonApiEvent_riot-messaging-service_v1_message') {
-                if(data.uri.startsWith(matchCorePrefix)) {
-                    gameID = data.uri.substring(matchCorePrefix.length);
+                    previousGameID = gameID
+                    gameID = null
+                    preGameID = null
+                } else if(data.uri.startsWith(matchCorePrefix)) {
+                    if(gameID === null) {
+                        const id = data.uri.substring(matchCorePrefix.length);
+                        if(id !== previousGameID) {
+                            gameID = id
+                            onGameStart(gameID)
+                        }
+                    }
+                } else if(data.uri.startsWith(preGamePrefix)) {
+                    if(preGameID === null) {
+                        preGameID = data.uri.substring(matchCorePrefix.length);
+                        onPreGameStart(preGameID)
+                    }
                 }
             }
         })
