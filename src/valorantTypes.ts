@@ -134,6 +134,14 @@ export interface PregameMatchData {
     }[]
 }
 
+// Subset of all data
+export interface CoregameMatchData {
+    MatchID: string
+    Players: {
+        Subject: string
+    }[]
+}
+
 // Subset of all match data
 export interface ValorantMatchData {
     matchInfo: {

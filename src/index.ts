@@ -2,13 +2,14 @@ import 'dotenv/config'
 import OBSWebSocket from 'obs-websocket-js'
 import {ValorantAPI} from './ValorantAPI.js'
 import {
+    CoregameMatchData,
     LockfileData, MapDataResponse, PregameMatchData, PrivatePresence,
     ValorantChatSessionResponse,
     ValorantEvent,
     ValorantExternalSessionsResponse, ValorantMatchData,
     ValorantWebsocketEvent
 } from './valorantTypes'
-import {loadConfig} from './config.js'
+import {Config, loadConfig} from './config.js'
 import {WebSocket} from 'ws'
 import {promises as fs} from 'node:fs'
 import path from 'node:path'
@@ -28,21 +29,54 @@ async function asyncTimeout(delay: number) {
     })
 }
 
-async function runOBSTest() {
-    const obs = new OBSWebSocket()
-    await obs.connect(`ws://${process.env['OBS_IP']}:${process.env['OBS_PORT']}`, process.env['OBS_PASSWORD'])
-    await obs.call('StartRecord')
-    await asyncTimeout(1 * 1000)
-    const response = await obs.call('StopRecord')
-    console.log(response)
-    await obs.disconnect()
-}
-
 const matchCorePrefix = '/riot-messaging-service/v1/message/ares-core-game/core-game/v1/matches/'
 const preGamePrefix = '/riot-messaging-service/v1/message/ares-pregame/pregame/v1/matches/'
 const gameEndURI = '/riot-messaging-service/v1/message/ares-match-details/match-details/v1/matches'
 const clientPlatform = 'ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9'
 const requestDelay = 5 * 1000
+
+let gameVersion: string | null = null
+let mapData: MapDataResponse | null = null
+
+let gameID: string | null = null
+let preGameID: string | null = null
+let previousGameID: string | null = null
+let dataDir: string | null = null
+let websocketEvents: ValorantWebsocketEvent[] = []
+
+async function loadPlayerData(val: ValorantAPI, dataDir: string, puuids: string[], ownPuuid: string, config: Config) {
+    // Load game version if not already loaded
+    if(gameVersion === null) {
+        const presences = (await val.getPresences()).presences
+        const ownPresence = presences.find(presence => presence.puuid === ownPuuid)
+        if(ownPresence === undefined) {
+            console.warn('Own presence data was not found')
+        } else {
+            const privateData = JSON.parse(Buffer.from(ownPresence.private, 'base64').toString('utf-8')) as PrivatePresence
+            gameVersion = privateData.partyClientVersion
+        }
+    }
+
+    // MMR and match history
+    const mmrPath = path.join(dataDir, 'mmr')
+    await fs.mkdir(mmrPath)
+    const matchHistoryPath = path.join(dataDir, 'history')
+    await fs.mkdir(matchHistoryPath)
+
+    for(const puuid of puuids) {
+        console.log(`Getting mmr and match history data ${puuid}`)
+        await asyncTimeout(requestDelay)
+        const mmrData = await val.requestRemotePD(`mmr/v1/players/${puuid}`, config.data.region, {
+            'X-Riot-ClientPlatform': clientPlatform,
+            'X-Riot-ClientVersion': gameVersion
+        })
+        await fs.writeFile(path.join(mmrPath, `${puuid}.json`), JSON.stringify(mmrData), 'utf-8')
+
+        await asyncTimeout(requestDelay)
+        const matchHistoryData = await val.requestRemotePD(`match-history/v1/history/${puuid}?endIndex=25`, config.data.region)
+        await fs.writeFile(path.join(matchHistoryPath, `${puuid}.json`), JSON.stringify(matchHistoryData), 'utf-8')
+    }
+}
 
 async function main() {
     const config = await loadConfig()
@@ -65,15 +99,6 @@ async function main() {
         const ws = new WebSocket(`wss://riot:${lockfileData.password}@127.0.0.1:${lockfileData.port}`, {
             rejectUnauthorized: false
         });
-
-        let gameVersion: string | null = null
-        let mapData: MapDataResponse | null = null
-
-        let gameID: string | null = null
-        let preGameID: string | null = null
-        let previousGameID: string | null = null
-        let dataDir: string | null = null
-        let websocketEvents: ValorantWebsocketEvent[] = []
 
         ws.on('close', () => {
             console.log('Disconnected from Valorant')
@@ -162,14 +187,28 @@ async function main() {
                             // Game start
                             console.log(`Game ${gameID} started!`)
 
-                            if(config.data.enable && dataDir !== null) {
+                            if(preGameID === null && config.obs.enable) {
+                                await obs.call('StartRecord')
+                            }
+
+                            if(config.data.enable) {
+                                if(dataDir === null) {
+                                    dataDir = path.join(config.data.path, gameID)
+                                    await fs.mkdir(dataDir, {recursive: true})
+                                }
                                 await asyncTimeout(15 * 1000)
                                 console.log('Getting coregame and loadout data')
-                                const coreGameData = await val.requestRemoteGLZ(`core-game/v1/matches/${gameID}`, config.data.region)
+                                const coreGameData = await val.requestRemoteGLZ<CoregameMatchData>(`core-game/v1/matches/${gameID}`, config.data.region)
                                 await fs.writeFile(path.join(dataDir, 'coregame-match.json'), JSON.stringify(coreGameData), 'utf-8')
                                 await asyncTimeout(requestDelay)
                                 const loadoutsData = await val.requestRemoteGLZ(`core-game/v1/matches/${gameID}/loadouts`, config.data.region)
                                 await fs.writeFile(path.join(dataDir, 'loadouts.json'), JSON.stringify(loadoutsData), 'utf-8')
+
+                                // Grab players if there was no pregame
+                                if(preGameID === null) {
+                                    const puuids = coreGameData.Players.map(player => player.Subject)
+                                    await loadPlayerData(val, dataDir, puuids, chatSession.puuid, config)
+                                }
                             }
                         }
                     }
@@ -195,39 +234,9 @@ async function main() {
                             const pregameMatchData: PregameMatchData = await val.requestRemoteGLZ(`pregame/v1/matches/${preGameID}`, config.data.region)
                             await fs.writeFile(path.join(dataDir, 'pregame-match.json'), JSON.stringify(pregameMatchData), 'utf-8')
 
-                            // Load game version if not already loaded
-                            if(gameVersion === null) {
-                                const presences = (await val.getPresences()).presences
-                                const ownPresence = presences.find(presence => presence.puuid === chatSession.puuid)
-                                if(ownPresence === undefined) {
-                                    console.warn('Own presence data was not found')
-                                } else {
-                                    const privateData = JSON.parse(Buffer.from(ownPresence.private, 'base64').toString('utf-8')) as PrivatePresence
-                                    gameVersion = privateData.partyClientVersion
-                                }
-                            }
-
-                            // MMR and match history
-                            const mmrPath = path.join(dataDir, 'mmr')
-                            await fs.mkdir(mmrPath)
-                            const matchHistoryPath = path.join(dataDir, 'history')
-                            await fs.mkdir(matchHistoryPath)
-
-                            for(const team of pregameMatchData.Teams) {
-                                for(const player of team.Players) {
-                                    console.log(`Getting mmr and match history data ${player.Subject}`)
-                                    await asyncTimeout(requestDelay)
-                                    const mmrData = await val.requestRemotePD(`mmr/v1/players/${player.Subject}`, config.data.region, {
-                                        'X-Riot-ClientPlatform': clientPlatform,
-                                        'X-Riot-ClientVersion': gameVersion
-                                    })
-                                    await fs.writeFile(path.join(mmrPath, `${player.Subject}.json`), JSON.stringify(mmrData), 'utf-8')
-
-                                    await asyncTimeout(requestDelay)
-                                    const matchHistoryData = await val.requestRemotePD(`match-history/v1/history/${player.Subject}?endIndex=25`, config.data.region)
-                                    await fs.writeFile(path.join(matchHistoryPath, `${player.Subject}.json`), JSON.stringify(matchHistoryData), 'utf-8')
-                                }
-                            }
+                            const puuids = pregameMatchData.Teams.reduce((prev: string[], current) =>
+                                prev.concat(current.Players.map(player => player.Subject)), [])
+                            await loadPlayerData(val, dataDir, puuids, chatSession.puuid, config)
                         }
                     }
                 }

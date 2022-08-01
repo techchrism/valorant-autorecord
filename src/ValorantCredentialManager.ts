@@ -34,7 +34,7 @@ const localAgent = new https.Agent({
 })
 
 // Subtracts this amount from expiration to avoid requesting resources with an about-to-expire cred
-const expirationDiff = 60 * 1000
+const expirationDiff = 5 * 1000
 
 export class ValorantCredentialManager {
     private credentials: ValorantCredentials | null = null
@@ -75,5 +75,6 @@ export class ValorantCredentialManager {
             entitlement: data.token
         }
         this.expiration = (jwtPayload.exp * 1000) - expirationDiff
+        console.log(`Credentials expire in ${this.expiration / 1000} seconds`)
     }
 }
