@@ -206,6 +206,7 @@ async function main() {
 
                                 // Grab players if there was no pregame
                                 if(preGameID === null) {
+                                    websocketEvents = []
                                     const puuids = coreGameData.Players.map(player => player.Subject)
                                     await loadPlayerData(val, dataDir, puuids, chatSession.puuid, config)
                                 }
@@ -243,7 +244,7 @@ async function main() {
             }
 
             // Save to websocket log
-            if(preGameID !== null && config.data.enable) {
+            if((preGameID !== null || gameID !== null) && config.data.enable) {
                 websocketEvents.push({event, data})
             }
         })
