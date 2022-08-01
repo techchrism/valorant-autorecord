@@ -10,6 +10,7 @@ export interface Config {
     data: {
         enable: boolean
         path: string
+        region: string
     }
 }
 
@@ -22,7 +23,8 @@ const defaultConfig: Config = {
     },
     data: {
         enable: true,
-        path: ''
+        path: 'data',
+        region: 'na'
     }
 }
 

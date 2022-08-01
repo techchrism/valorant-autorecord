@@ -110,8 +110,26 @@ export interface ValorantEvent {
     uri: string
 }
 
+export interface ValorantPresenceResponse {
+    presences: Presence[]
+}
+
 export interface ValorantPresenceEvent extends ValorantEvent {
-    data: {
-        presences: Presence[]
-    }
+    data: ValorantPresenceResponse
+}
+
+export interface ValorantWebsocketEvent {
+    event: string
+    data: ValorantEvent
+}
+
+// Subset of all data
+export interface PregameMatchData {
+    ID: string
+    Teams: {
+        TeamID: string
+        Players: {
+            Subject: string
+        }[]
+    }[]
 }

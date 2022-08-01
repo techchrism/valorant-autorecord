@@ -9,8 +9,9 @@ import {
     LockfileData,
     ValorantChatSessionResponse,
     ValorantExternalSessionsResponse,
-    ValorantHelpResponse
+    ValorantHelpResponse, ValorantPresenceResponse
 } from "./valorantTypes";
+import {ValorantCredentialManager} from "./ValorantCredentialManager.js";
 
 export interface ValorantAPIEvents {
     ready(lockfileData: LockfileData,
@@ -82,13 +83,14 @@ async function awaitTimeout(timeout: number, signal?: AbortSignal) {
 }
 
 export class ValorantAPI extends EE<ValorantAPIEvents> {
-    private watcher: FSWatcher;
-    private readonly lockfilePath: string;
-    private connectionAbort?: AbortController;
-    private lockfileData: LockfileData | undefined;
+    private watcher: FSWatcher
+    private readonly lockfilePath: string
+    private connectionAbort?: AbortController
+    private lockfileData: LockfileData | undefined
+    private credentialManager: ValorantCredentialManager | undefined
 
     constructor() {
-        super();
+        super()
 
         this.lockfilePath = path.join(process.env['LOCALAPPDATA']!, 'Riot Games\\Riot Client\\Config\\lockfile');
         this.watcher = fs.watch(path.dirname(this.lockfilePath), async (eventType, fileName) => {
@@ -135,6 +137,7 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
                 }
 
                 this.lockfileData = lockfileData
+                this.credentialManager = new ValorantCredentialManager(lockfileData)
                 return {chatSession, sessions}
             } catch(e) {
                 if(signal?.aborted) {
@@ -163,5 +166,47 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
             }
             await awaitTimeout(1000, signal)
         }
+    }
+
+    /**
+     * Get a list of presence data
+     */
+    async getPresences(): Promise<ValorantPresenceResponse> {
+        if(this.lockfileData === undefined) throw new Error('Lockfile not ready')
+        return getLocalAPI(this.lockfileData, 'chat/v4/presences')
+    }
+
+    private async requestWithAuth<T>(path: string, extraHeaders: object = {}): Promise<T> {
+        if(this.credentialManager === undefined) {
+            throw new Error('Credential manager not available')
+        }
+        const creds = await this.credentialManager.getCredentials()
+        return (await (await fetch(path, {
+            headers: {
+                'Authorization': 'Bearer ' + creds.token,
+                'X-Riot-Entitlements-JWT': creds.entitlement,
+                ...extraHeaders
+            }
+        })).json() as T)
+    }
+
+    /**
+     * Makes an API request to a "glz" endpoint. Requires lockfile data to populate credentials
+     * @param path The path to request
+     * @param region Region for the endpoint domain
+     * @param extraHeaders Object with extra headers to add to the request
+     */
+    async requestRemoteGLZ<T>(path: string, region: string, extraHeaders: object = {}): Promise<T> {
+        return this.requestWithAuth(`https://glz-${region}-1.${region}.a.pvp.net/${path}`, extraHeaders)
+    }
+
+    /**
+     * Makes an API request to a "pd" endpoint. Requires lockfile data to populate credentials
+     * @param path The path to request
+     * @param region Region for the endpoint domain
+     * @param extraHeaders Object with extra headers to add to the request
+     */
+    async requestRemotePD<T>(path: string, region: string, extraHeaders: object = {}): Promise<T> {
+        return this.requestWithAuth(`https://pd.${region}.a.pvp.net/${path}`, extraHeaders)
     }
 }
