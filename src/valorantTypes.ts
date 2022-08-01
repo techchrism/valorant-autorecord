@@ -133,3 +133,29 @@ export interface PregameMatchData {
         }[]
     }[]
 }
+
+// Subset of all match data
+export interface ValorantMatchData {
+    matchInfo: {
+        queueID: string
+        mapId: string
+        gameMode: string
+    }
+    players: {
+        subject: string
+        teamId: string
+    }[]
+    teams: {
+        teamId: string
+        won: boolean
+        roundsWon: number
+        numPoints: number
+    }[] | null
+}
+
+export interface MapDataResponse {
+    data: {
+        displayName: string
+        mapUrl: string
+    }[]
+}

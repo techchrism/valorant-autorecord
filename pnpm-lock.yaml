@@ -1,10 +1,12 @@
 lockfileVersion: 5.4
 
 specifiers:
+  '@types/mustache': ^4.2.1
   '@types/node': ^18.6.1
   '@types/ws': ^8.5.3
   dotenv: ^16.0.1
   ee-ts: ^1.0.2
+  mustache: ^4.2.0
   node-fetch: ^3.2.9
   obs-websocket-js: ^5.0.0
   typescript: ^4.7.4
@@ -13,11 +15,13 @@ specifiers:
 dependencies:
   dotenv: 16.0.1
   ee-ts: 1.0.2_typescript@4.7.4
+  mustache: 4.2.0
   node-fetch: 3.2.9
   obs-websocket-js: 5.0.0
   ws: 8.8.1
 
 devDependencies:
+  '@types/mustache': 4.2.1
   '@types/node': 18.6.1
   '@types/ws': 8.5.3
   typescript: 4.7.4
@@ -28,6 +32,10 @@ packages:
     resolution: {integrity: sha512-rYEi46+gIzufyYUAoHDnRzkWGxajpD9vVXFQ3g1vbjrBm6P7MBmm+s/fqPa46sxa+8FOUdEuRQKaugo5a4JWpw==}
     engines: {node: '>= 10'}
     dev: false
+
+  /@types/mustache/4.2.1:
+    resolution: {integrity: sha512-gFAlWL9Ik21nJioqjlGCnNYbf9zHi0sVbaZ/1hQEBcCEuxfLJDvz4bVJSV6v6CUaoLOz0XEIoP7mSrhJ6o237w==}
+    dev: true
 
   /@types/node/18.6.1:
     resolution: {integrity: sha512-z+2vB6yDt1fNwKOeGbckpmirO+VBDuQqecXkgeIqDlaOtmKn6hPR/viQ8cxCfqLU4fTlvM3+YjM367TukWdxpg==}
@@ -103,6 +111,11 @@ packages:
 
   /ms/2.1.2:
     resolution: {integrity: sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==}
+    dev: false
+
+  /mustache/4.2.0:
+    resolution: {integrity: sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ==}
+    hasBin: true
     dev: false
 
   /node-domexception/1.0.0:

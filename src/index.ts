@@ -2,17 +2,25 @@ import 'dotenv/config'
 import OBSWebSocket from 'obs-websocket-js'
 import {ValorantAPI} from './ValorantAPI.js'
 import {
-    LockfileData, PregameMatchData, PrivatePresence,
+    LockfileData, MapDataResponse, PregameMatchData, PrivatePresence,
     ValorantChatSessionResponse,
     ValorantEvent,
-    ValorantExternalSessionsResponse,
+    ValorantExternalSessionsResponse, ValorantMatchData,
     ValorantWebsocketEvent
 } from './valorantTypes'
 import {loadConfig} from './config.js'
 import {WebSocket} from 'ws'
 import {promises as fs} from 'node:fs'
 import path from 'node:path'
+import Mustache from 'mustache'
+import fetch from 'node-fetch'
 
+// @ts-ignore
+Mustache.escape! = v => v
+
+interface StopRecordResponse {
+    outputPath: string
+}
 
 async function asyncTimeout(delay: number) {
     return new Promise((resolve, reject) => {
@@ -59,6 +67,7 @@ async function main() {
         });
 
         let gameVersion: string | null = null
+        let mapData: MapDataResponse | null = null
 
         let gameID: string | null = null
         let preGameID: string | null = null
@@ -92,8 +101,10 @@ async function main() {
                         // Game end
                         console.log(`Game ${gameID} ended!`)
 
+                        let outputPath: string | null = null
                         if(config.obs.enable) {
-                            await obs.call('StopRecord')
+                            const response = (await obs.call('StopRecord')) as unknown as StopRecordResponse
+                            outputPath = response.outputPath
                         }
 
                         if(config.data.enable && dataDir !== null) {
@@ -101,8 +112,39 @@ async function main() {
 
                             await asyncTimeout(requestDelay)
                             console.log('Getting match data')
-                            const matchData = await val.requestRemotePD(`match-details/v1/matches/${gameID}`, config.data.region)
+                            const matchData = await val.requestRemotePD<ValorantMatchData>(`match-details/v1/matches/${gameID}`, config.data.region)
                             await fs.writeFile(path.join(dataDir, 'match.json'), JSON.stringify(matchData), 'utf-8')
+
+                            if(outputPath !== null) {
+                                if(mapData === null) {
+                                    mapData = (await (await fetch('https://valorant-api.com/v1/maps')).json()) as MapDataResponse
+                                }
+                                let score = ''
+                                const ownPlayer = matchData.players.find(player => player.subject === chatSession.puuid)
+                                if(ownPlayer !== undefined && matchData.teams !== null) {
+                                    const ownScore = matchData.teams.find(team => team.teamId === ownPlayer.teamId)!.numPoints
+
+                                    if(matchData.teams.length === 1) {
+                                        score = ownScore.toString()
+                                    } else {
+                                        const maxScore = matchData.teams.filter(team => team.teamId !== ownPlayer.teamId)
+                                            .sort((t1, t2) => t2.numPoints - t1.numPoints)[0].numPoints
+                                        score = `${ownScore}-${maxScore}`
+                                    }
+                                }
+
+                                const extension = path.extname(outputPath)
+                                const newPath = Mustache.render(config.obs.renameTemplate, {
+                                    directory: path.dirname(outputPath),
+                                    extension,
+                                    'original-name': path.basename(outputPath, extension),
+                                    map: mapData.data.find(map => map.mapUrl === matchData.matchInfo.mapId)?.displayName || '',
+                                    queue: matchData.matchInfo.queueID,
+                                    score
+                                })
+                                console.log(`Renaming ${outputPath} to ${newPath}`)
+                                await fs.rename(outputPath, newPath)
+                            }
                         }
                     }
                     previousGameID = gameID

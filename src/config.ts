@@ -6,6 +6,8 @@ export interface Config {
         ip: string
         port: number
         password: string
+        renameFile: boolean
+        renameTemplate: string
     }
     data: {
         enable: boolean
@@ -19,7 +21,9 @@ const defaultConfig: Config = {
         enable: true,
         ip: '127.0.0.1',
         port: 4455,
-        password: ''
+        password: '',
+        renameFile: true,
+        renameTemplate: '{{directory}}/{{original-name}} {{queue}} {{map}} {{score}}{{extension}}'
     },
     data: {
         enable: true,
