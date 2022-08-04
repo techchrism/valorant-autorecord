@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ttsc && node ./build/index.js",
-    "build": "ttsc"
+    "start": "node ./build/index.js",
+    "build": "tsc"
   },
   "keywords": [],
   "author": "techchrism",
@@ -19,7 +19,6 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "dotenv": "^16.0.1",
     "ee-ts": "^1.0.2",
     "mustache": "^4.2.0",
     "node-fetch": "^3.2.9",

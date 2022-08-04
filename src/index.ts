@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import OBSWebSocket from 'obs-websocket-js'
 import {ValorantAPI} from './ValorantAPI.js'
 import {
