@@ -192,6 +192,11 @@ async function main() {
                             }
 
                             if(config.data.enable) {
+                                // Reset websocket events log if there was no pregame to reset it
+                                if(preGameID === null) {
+                                    websocketEvents = []
+                                }
+
                                 if(dataDir === null) {
                                     dataDir = path.join(config.data.path, gameID)
                                     await fs.mkdir(dataDir, {recursive: true})
@@ -204,12 +209,8 @@ async function main() {
                                 const loadoutsData = await val.requestRemoteGLZ(`core-game/v1/matches/${gameID}/loadouts`, config.data.region)
                                 await fs.writeFile(path.join(dataDir, 'loadouts.json'), JSON.stringify(loadoutsData), 'utf-8')
 
-                                // Grab players if there was no pregame
-                                if(preGameID === null) {
-                                    websocketEvents = []
-                                    const puuids = coreGameData.Players.map(player => player.Subject)
-                                    await loadPlayerData(val, dataDir, puuids, chatSession.puuid, config)
-                                }
+                                const puuids = coreGameData.Players.map(player => player.Subject)
+                                await loadPlayerData(val, dataDir, puuids, chatSession.puuid, config)
                             }
                         }
                     }
@@ -234,10 +235,6 @@ async function main() {
                             console.log('Getting pregame data')
                             const pregameMatchData: PregameMatchData = await val.requestRemoteGLZ(`pregame/v1/matches/${preGameID}`, config.data.region)
                             await fs.writeFile(path.join(dataDir, 'pregame-match.json'), JSON.stringify(pregameMatchData), 'utf-8')
-
-                            const puuids = pregameMatchData.Teams.reduce((prev: string[], current) =>
-                                prev.concat(current.Players.map(player => player.Subject)), [])
-                            await loadPlayerData(val, dataDir, puuids, chatSession.puuid, config)
                         }
                     }
                 }
