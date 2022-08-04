@@ -75,6 +75,6 @@ export class ValorantCredentialManager {
             entitlement: data.token
         }
         this.expiration = (jwtPayload.exp * 1000) - expirationDiff
-        console.log(`Credentials expire in ${this.expiration / 1000} seconds`)
+        console.log(`Credentials expire in ${(this.expiration - Date.now()) / 1000} seconds`)
     }
 }
