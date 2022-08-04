@@ -10,3 +10,10 @@ A script to automatically record your Valorant games
  - Saves pregame, coregame, and match details
  - Saves loadout data
  - Saves websocket events (includes chat)
+
+## Installation
+
+ - Clone / download and unzip the repository
+ - Run `npm install` followed by `npm run build`
+ - To start, use `npm start`
+ - Configure the application by modifying `config.json`
