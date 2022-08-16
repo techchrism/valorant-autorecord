@@ -161,7 +161,7 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
             // "OnJsonApiEvent_chat_v4_presences" is an event that has been observed to only be present when all the other events are loaded
             // This appears to go in stages:
             // Observed going from 45->53->57->67 events
-            if(help.events.hasOwnProperty('OnJsonApiEvent_chat_v4_presences')) {
+            if(help.events.hasOwnProperty('OnJsonApiEvent_chat_v4_presences') && help.events.hasOwnProperty('OnJsonApiEvent_riot-messaging-service_v1_message')) {
                 return help
             }
             await awaitTimeout(1000, signal)
