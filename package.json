@@ -9,7 +9,7 @@
     "start": "node ./build/index.js",
     "build": "tsc",
     "watch": "tsc --watch",
-    "package": "tsc && esbuild ./build/index.js --bundle --platform=node --inject:./src/standaloneErrorHandler.js --outfile=./build/index.cjs --allow-overwrite && pkg ./build/index.cjs --targets node16-windows-x64 --compress brotli --out-path ./build"
+    "package": "tsc && esbuild ./build/index.js --bundle --platform=node --inject:./src/standaloneErrorHandler.js --outfile=./build/index.cjs --allow-overwrite && pkg ./build/index.cjs --targets node16-windows-x64 --compress brotli --output ./build/Valorant-AutoRecord"
   },
   "keywords": [],
   "author": "techchrism",
