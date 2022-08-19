@@ -1,9 +1,5 @@
 name: Build on Push
-on:
-  push:
-    branches:
-      - trunk
-  pull_request:
+on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
