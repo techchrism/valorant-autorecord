@@ -86,9 +86,8 @@ async function main() {
         try {
             await obs.connect(`ws://${config.obs.ip}:${config.obs.port}`, config.obs.password)
         } catch(e) {
-            console.error(e)
             console.error('Failed to connect to OBS')
-            process.exit(1)
+            throw e
         }
     }
 
