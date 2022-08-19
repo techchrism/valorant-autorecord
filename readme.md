@@ -14,5 +14,6 @@ A script to automatically record your Valorant games
 ## Usage
 
  - [Download the latest release](../../releases/latest/download/Valorant-AutoRecord.exe)
+ - If Windows SmartScreen pops up ("Windows protected your PC"), click "More info" then "Run anyway"
  - Run it once to generate the config file
  - Configure the application by modifying `config.json`
