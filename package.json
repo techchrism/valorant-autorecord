@@ -9,7 +9,7 @@
     "start": "node ./build/index.js",
     "build": "tsc",
     "watch": "tsc --watch",
-    "package": "tsc && esbuild ./build/index.js --bundle --platform=node --outfile=./bundle/index.cjs --allow-overwrite"
+    "package": "tsc && esbuild ./build/index.js --bundle --platform=node --inject:./src/standaloneErrorHandler.js --outfile=./build/index.cjs --allow-overwrite && pkg ./build/index.cjs --targets node16-windows-x64 --compress brotli --out-path ./build"
   },
   "keywords": [],
   "author": "techchrism",
@@ -19,6 +19,7 @@
     "@types/node": "^18.6.1",
     "@types/ws": "^8.5.3",
     "esbuild": "^0.15.5",
+    "pkg": "^5.8.0",
     "typescript": "^4.7.4"
   },
   "dependencies": {
