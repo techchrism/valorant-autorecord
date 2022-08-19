@@ -11,9 +11,8 @@ A script to automatically record your Valorant games
  - Saves loadout data
  - Saves websocket events (includes chat)
 
-## Installation
+## Usage
 
- - Clone / download and unzip the repository
- - Run `npm install` followed by `npm run build`
- - To start, use `npm start`
+ - [Download the latest release](../../releases/latest/download/Valorant-AutoRecord.exe)
+ - Run it once to generate the config file
  - Configure the application by modifying `config.json`
