@@ -131,6 +131,9 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
         while(true) {
             try {
                 const chatSession = await getLocalAPI<ValorantChatSessionResponse>(lockfileData, 'chat/v1/session', signal);
+                if(!chatSession.puuid) {
+                    throw new Error('No puuid in chat session')
+                }
                 const sessions = await getLocalAPI<ValorantExternalSessionsResponse>(lockfileData, 'product-session/v1/external-sessions', signal)
                 if(Object.keys(sessions).length === 0) {
                     throw new Error('No keys on session data')
