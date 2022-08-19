@@ -83,7 +83,13 @@ async function main() {
     // Try connecting to OBS
     const obs = new OBSWebSocket()
     if(config.obs.enable) {
-        await obs.connect(`ws://${config.obs.ip}:${config.obs.port}`, config.obs.password)
+        try {
+            await obs.connect(`ws://${config.obs.ip}:${config.obs.port}`, config.obs.password)
+        } catch(e) {
+            console.error(e)
+            console.error('Failed to connect to OBS')
+            process.exit(1)
+        }
     }
 
     // Set up Valorant API
