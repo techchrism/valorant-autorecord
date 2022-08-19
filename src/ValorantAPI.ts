@@ -6,11 +6,11 @@ import fetch from 'node-fetch'
 import https from 'node:https'
 import {clearTimeout} from "timers";
 import {
-    LockfileData,
+    LockfileData, PrivatePresence,
     ValorantChatSessionResponse,
     ValorantExternalSessionsResponse,
     ValorantHelpResponse, ValorantPresenceResponse
-} from "./valorantTypes";
+} from './valorantTypes'
 import {ValorantCredentialManager} from "./ValorantCredentialManager.js";
 
 export interface ValorantAPIEvents {
@@ -120,7 +120,7 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
      * Tries to connect to Valorant and initiate communication
      * @param signal Optional abort signal
      */
-    async tryConnect(signal?: AbortSignal) {
+    async tryConnect(signal?: AbortSignal): Promise<{ sessions: ValorantExternalSessionsResponse; chatSession: ValorantChatSessionResponse }> {
         const lockfileData = await getLockfileData(this.lockfilePath, signal)
 
         if(lockfileData.name !== 'Riot Client') {
@@ -148,6 +148,21 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
         }
     }
 
+    async waitForPrivatePresence(puuid: string, signal?: AbortSignal): Promise<PrivatePresence> {
+        if(this.lockfileData === undefined) throw new Error('Lockfile not ready')
+        while(true) {
+            try {
+                const data = await getLocalAPI<ValorantPresenceResponse>(this.lockfileData, 'chat/v4/presences', signal)
+                const presence = data.presences.find(p => p.puuid === puuid)
+                if(presence !== undefined) {
+                    return JSON.parse(Buffer.from(presence.private, 'base64').toString());
+                }
+            } catch(ignored) {}
+
+            await awaitTimeout(1000, signal)
+        }
+    }
+
     /**
      * Wait for "help" data with the full listing of events to be ready
      * This is needed because as Valorant loads in, not all events are shown on the help endpoint
@@ -156,14 +171,27 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
      */
     async getFullHelp(signal?: AbortSignal): Promise<ValorantHelpResponse> {
         if(this.lockfileData === undefined) throw new Error('Lockfile not ready')
+
+        const requiredEvents = ['OnJsonApiEvent_chat_v4_presences'];
+
         while(true) {
             const help = await getLocalAPI<ValorantHelpResponse>(this.lockfileData, 'help', signal)
             // "OnJsonApiEvent_chat_v4_presences" is an event that has been observed to only be present when all the other events are loaded
             // This appears to go in stages:
             // Observed going from 45->53->57->67 events
-            if(help.events.hasOwnProperty('OnJsonApiEvent_chat_v4_presences') && help.events.hasOwnProperty('OnJsonApiEvent_riot-messaging-service_v1_message')) {
-                return help
+            let missing: string[] = []
+            for(const event of requiredEvents) {
+                if(!help.events.hasOwnProperty(event)) {
+                    missing.push(event)
+                }
             }
+
+            if(missing.length === 0) {
+                return help
+            } else {
+                console.log(`Found ${Object.keys(help.events).length} events, missing: ${missing.join(', ')}`)
+            }
+
             await awaitTimeout(1000, signal)
         }
     }

@@ -97,7 +97,8 @@ async function main() {
     val.on('ready', async (lockfileData: LockfileData,
                            chatSession: ValorantChatSessionResponse,
                            externalSessions: ValorantExternalSessionsResponse) => {
-        console.log('Valorant started, waiting for events...')
+        console.log(`Valorant started, waiting for presence with puuid ${chatSession.puuid}`)
+        const privatePresence = val.waitForPrivatePresence(chatSession.puuid)
         const help = await val.getFullHelp()
         console.log(`Loaded ${Object.keys(help.events).length} events, waiting for game...`)
 
@@ -110,10 +111,14 @@ async function main() {
         })
         ws.on('open', () => {
             // Subscribe to all events by name
+            const alwaysSubscribe = ['OnJsonApiEvent_chat_v4_presences', 'OnJsonApiEvent_riot-messaging-service_v1_message']
             Object.entries(help.events).forEach(([name, desc]) => {
-                if(name === 'OnJsonApiEvent') return;
+                if(name === 'OnJsonApiEvent' || alwaysSubscribe.includes(name)) return;
                 ws.send(JSON.stringify([5, name]));
             });
+            for(const name of alwaysSubscribe) {
+                ws.send(JSON.stringify([5, name]));
+            }
         })
         ws.on('message', async message => {
             let event: string, data: ValorantEvent
