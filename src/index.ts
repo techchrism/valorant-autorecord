@@ -141,44 +141,45 @@ async function main() {
                             outputPath = response.outputPath
                         }
 
+                        await asyncTimeout(requestDelay)
+                        console.log('Getting match data')
+                        const matchData = await val.requestRemotePD<ValorantMatchData>(`match-details/v1/matches/${gameID}`, config.data.region)
+
+                        // Rename output file with match data
+                        if(outputPath !== null) {
+                            if(mapData === null) {
+                                mapData = (await (await fetch('https://valorant-api.com/v1/maps')).json()) as MapDataResponse
+                            }
+                            let score = ''
+                            const ownPlayer = matchData.players.find(player => player.subject === chatSession.puuid)
+                            if(ownPlayer !== undefined && matchData.teams !== null) {
+                                const ownScore = matchData.teams.find(team => team.teamId === ownPlayer.teamId)!.numPoints
+
+                                if(matchData.teams.length === 1) {
+                                    score = ownScore.toString()
+                                } else {
+                                    const maxScore = matchData.teams.filter(team => team.teamId !== ownPlayer.teamId)
+                                        .sort((t1, t2) => t2.numPoints - t1.numPoints)[0].numPoints
+                                    score = `${ownScore}-${maxScore}`
+                                }
+                            }
+
+                            const extension = path.extname(outputPath)
+                            const newPath = Mustache.render(config.obs.renameTemplate, {
+                                directory: path.dirname(outputPath),
+                                extension,
+                                'original-name': path.basename(outputPath, extension),
+                                map: mapData.data.find(map => map.mapUrl === matchData.matchInfo.mapId)?.displayName || '',
+                                queue: matchData.matchInfo.queueID,
+                                score
+                            })
+                            console.log(`Renaming ${outputPath} to ${newPath}`)
+                            await fs.rename(outputPath, newPath)
+                        }
+
                         if(config.data.enable && dataDir !== null) {
                             await fs.writeFile(path.join(dataDir, 'events.json'), JSON.stringify(websocketEvents), 'utf-8')
-
-                            await asyncTimeout(requestDelay)
-                            console.log('Getting match data')
-                            const matchData = await val.requestRemotePD<ValorantMatchData>(`match-details/v1/matches/${gameID}`, config.data.region)
                             await fs.writeFile(path.join(dataDir, 'match.json'), JSON.stringify(matchData), 'utf-8')
-
-                            if(outputPath !== null) {
-                                if(mapData === null) {
-                                    mapData = (await (await fetch('https://valorant-api.com/v1/maps')).json()) as MapDataResponse
-                                }
-                                let score = ''
-                                const ownPlayer = matchData.players.find(player => player.subject === chatSession.puuid)
-                                if(ownPlayer !== undefined && matchData.teams !== null) {
-                                    const ownScore = matchData.teams.find(team => team.teamId === ownPlayer.teamId)!.numPoints
-
-                                    if(matchData.teams.length === 1) {
-                                        score = ownScore.toString()
-                                    } else {
-                                        const maxScore = matchData.teams.filter(team => team.teamId !== ownPlayer.teamId)
-                                            .sort((t1, t2) => t2.numPoints - t1.numPoints)[0].numPoints
-                                        score = `${ownScore}-${maxScore}`
-                                    }
-                                }
-
-                                const extension = path.extname(outputPath)
-                                const newPath = Mustache.render(config.obs.renameTemplate, {
-                                    directory: path.dirname(outputPath),
-                                    extension,
-                                    'original-name': path.basename(outputPath, extension),
-                                    map: mapData.data.find(map => map.mapUrl === matchData.matchInfo.mapId)?.displayName || '',
-                                    queue: matchData.matchInfo.queueID,
-                                    score
-                                })
-                                console.log(`Renaming ${outputPath} to ${newPath}`)
-                                await fs.rename(outputPath, newPath)
-                            }
                         }
                     }
                     previousGameID = gameID
