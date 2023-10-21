@@ -96,9 +96,11 @@ async function main() {
     val.on('ready', async (lockfileData: LockfileData,
                            chatSession: ValorantChatSessionResponse,
                            externalSessions: ValorantExternalSessionsResponse) => {
-        console.log(`Valorant started, waiting for presence with puuid ${chatSession.puuid}`)
-        const privatePresence = val.waitForPrivatePresence(chatSession.puuid)
-        const help = await val.getFullHelp()
+        console.log('Waiting for game readiness...')
+        await val.waitForInit(true)
+        console.log('Game ready!')
+
+        const help = await val.getHelp()
         console.log(`Loaded ${Object.keys(help.events).length} events, waiting for game...`)
 
         const ws = new WebSocket(`wss://riot:${lockfileData.password}@127.0.0.1:${lockfileData.port}`, {

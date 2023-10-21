@@ -12,12 +12,32 @@ import {
     ValorantHelpResponse, ValorantPresenceResponse
 } from './valorantTypes'
 import {ValorantCredentialManager} from "./ValorantCredentialManager.js";
+import {Tail} from 'tail'
 
 export interface ValorantAPIEvents {
     ready(lockfileData: LockfileData,
           chatSession: ValorantChatSessionResponse,
           externalSessions: ValorantExternalSessionsResponse): void
 }
+
+export interface ValorantInitCollectedData {
+    version: {
+        ciServerVersion: string
+        branch: string
+        changelist: number
+        buildVersion: number
+    }
+    puuid: string
+    region: string
+    shard: string
+}
+
+const localInitializationLogLineEnding = 'LogPlatformInitializerV2: Status is now: Initialized'
+const ciServerVersionRegex = /LogShooter: Display: CI server version: (?<version>.+)/
+const branchRegex = /LogShooter: Display: Branch: (?<branch>.+)/
+const changeListRegex = /LogShooter: Display: Changelist: (?<changelist>.+)/
+const buildVersionRegex = /LogShooter: Display: Build version: (?<buildVersion>.+)/
+const sessionAPICallRegex = /\[GET https:\/\/glz-(?<region>.+?)-1.(?<shard>.+?).a.pvp.net\/session\/v1\/sessions\/(?<puuid>.+?)\/reconnect\]/
 
 const localAgent = new https.Agent({
     rejectUnauthorized: false
@@ -167,36 +187,121 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
     }
 
     /**
-     * Wait for "help" data with the full listing of events to be ready
-     * This is needed because as Valorant loads in, not all events are shown on the help endpoint
-     * This function requires the lockfile data to be initialized and will throw if it isn't
-     * @param signal Optional abort signal
+     * Waits for the game to be initialized
+     * Called when local is ready
+     * Adapted from https://github.com/techchrism/valorant-api/blob/31399e5acefa1d9ce0432e713bb2495bcf5c507b/src/ValorantAPI.ts#L131
+     * @param readLog Whether to read the log file or not. Should be false when the lockfile is "fresh" because the lockfile is updated before the previous log is cleared
+     * @param signal Optional abort signal. Used for aborting the initiation wait when local becomes unready
      */
-    async getFullHelp(signal?: AbortSignal): Promise<ValorantHelpResponse> {
+    async waitForInit(readLog: boolean, signal?: AbortSignal): Promise<ValorantInitCollectedData> {
+        if(signal?.aborted) throw new Error('Aborted')
         if(this.lockfileData === undefined) throw new Error('Lockfile not ready')
 
-        const requiredEvents = ['OnJsonApiEvent_chat_v4_presences'];
+        return new Promise(async (resolve, reject) => {
+            let ciServerVersion: string | undefined = undefined
+            let branch: string | undefined = undefined
+            let changelist: number | undefined = undefined
+            let buildVersion: number | undefined = undefined
 
-        while(true) {
-            const help = await getLocalAPI<ValorantHelpResponse>(this.lockfileData, 'help', signal)
-            // "OnJsonApiEvent_chat_v4_presences" is an event that has been observed to only be present when all the other events are loaded
-            // This appears to go in stages:
-            // Observed going from 45->53->57->67 events
-            let missing: string[] = []
-            for(const event of requiredEvents) {
-                if(!help.events.hasOwnProperty(event)) {
-                    missing.push(event)
+            let shard: string | undefined = undefined
+            let region: string | undefined = undefined
+            let puuid: string | undefined = undefined
+
+            const logTail = new Tail(path.join(process.env['LOCALAPPDATA']!, '/VALORANT/Saved/Logs/ShooterGame.log'), {
+                useWatchFile: true,
+                fsWatchOptions: {
+                    interval: 250
+                }
+            })
+
+            const localInitializationLogListener = (line: string) => {
+                if(line.endsWith(localInitializationLogLineEnding)) {
+                    const initData = {
+                        version: {
+                            ciServerVersion: ciServerVersion || '',
+                            branch: branch || '',
+                            changelist: changelist || -1,
+                            buildVersion: buildVersion || -1
+                        },
+                        shard: shard || '',
+                        region: region || '',
+                        puuid: puuid || ''
+                    }
+
+                    logTail.unwatch()
+                    signal?.removeEventListener('abort', abortHandler)
+                    resolve(initData)
+                    return
+                }
+
+                if(ciServerVersion === undefined) {
+                    const match = ciServerVersionRegex.exec(line)
+                    if(match) {
+                        ciServerVersion = match.groups?.version || ''
+                        return
+                    }
+                }
+
+                if(branch === undefined) {
+                    const match = branchRegex.exec(line)
+                    if(match) {
+                        branch = match.groups?.branch || ''
+                        return
+                    }
+                }
+
+                if(changelist === undefined) {
+                    const match = changeListRegex.exec(line)
+                    if(match) {
+                        changelist = Number(match.groups?.changelist)
+                        return
+                    }
+                }
+
+                if(buildVersion === undefined) {
+                    const match = buildVersionRegex.exec(line)
+                    if(match) {
+                        buildVersion = Number(match.groups?.buildVersion)
+                        return
+                    }
+                }
+
+                if(shard === undefined) {
+                    const match = sessionAPICallRegex.exec(line)
+                    if(match) {
+                        shard = match.groups?.shard || ''
+                        region = match.groups?.region || ''
+                        puuid = match.groups?.puuid || ''
+                        return
+                    }
                 }
             }
-
-            if(missing.length === 0) {
-                return help
-            } else {
-                console.log(`Found ${Object.keys(help.events).length} events, missing: ${missing.join(', ')}`)
+            const abortHandler = () => {
+                logTail.unwatch()
+                reject(new Error('Aborted'))
             }
 
-            await awaitTimeout(1000, signal)
-        }
+            // Next, start watching the log and wait for confirmation
+            logTail.on('line', localInitializationLogListener)
+            signal?.addEventListener('abort', abortHandler)
+
+            // The promise will already be rejected from the abort handler if the signal was aborted
+            if(signal?.aborted) return
+
+            // Finally, request the log in full
+            if(readLog) {
+                const logData = await fs.promises.readFile(path.join(process.env['LOCALAPPDATA']!, '/VALORANT/Saved/Logs/ShooterGame.log'), 'utf-8')
+                if(signal?.aborted) return
+                for(const line of logData.split(/\r?\n/)) {
+                    localInitializationLogListener(line)
+                }
+            }
+        })
+    }
+
+    async getHelp(signal?: AbortSignal): Promise<ValorantHelpResponse> {
+        if(this.lockfileData === undefined) throw new Error('Lockfile not ready')
+        return await getLocalAPI<ValorantHelpResponse>(this.lockfileData, 'help', signal)
     }
 
     /**
