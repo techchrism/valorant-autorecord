@@ -3,9 +3,11 @@ import {promises as fs} from 'node:fs'
 export interface Config {
     obs: {
         enable: boolean
-        ip: string
-        port: number
-        password: string
+        connection?: {
+            ip: string
+            port: number
+            password: string
+        }
         renameFile: boolean
         renameTemplate: string
     }
@@ -18,9 +20,6 @@ export interface Config {
 const defaultConfig: Config = {
     obs: {
         enable: true,
-        ip: '127.0.0.1',
-        port: 4455,
-        password: '',
         renameFile: true,
         renameTemplate: '{{directory}}/{{original-name}} {{queue}} {{map}} {{score}}{{extension}}'
     },

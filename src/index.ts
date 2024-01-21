@@ -8,12 +8,14 @@ import {
     ValorantExternalSessionsResponse, ValorantMatchData,
     ValorantWebsocketEvent
 } from './valorantTypes'
-import {loadConfig} from './config.js'
+import {Config, loadConfig} from './config.js'
 import {WebSocket} from 'ws'
 import {promises as fs} from 'node:fs'
 import path from 'node:path'
 import Mustache from 'mustache'
 import fetch from 'node-fetch'
+import {run} from './util/run.js'
+import ini from 'ini'
 
 // @ts-ignore
 Mustache.escape! = v => v
@@ -83,8 +85,32 @@ async function main() {
     // Try connecting to OBS
     const obs = new OBSWebSocket()
     if(config.obs.enable) {
+        const connectionSettings = await run(async (): Promise<Exclude<Config['obs']['connection'], undefined>> => {
+            // If the connection settings are manually specified, use them
+            if(config.obs.connection !== undefined) return config.obs.connection
+
+            // Otherwise, try to get them from the OBS config file
+            const obsConfigPath = path.join(process.env['APPDATA']!, 'obs-studio', 'global.ini')
+            try {
+                const obsConfig = ini.parse(await fs.readFile(obsConfigPath, 'utf-8'))
+                const obsWebsocketConfig = obsConfig['OBSWebSocket'] as {
+                    ServerEnabled: boolean
+                    ServerPort: string
+                    ServerPassword: string
+                }
+
+                return {
+                    ip: '127.0.0.1',
+                    port: parseInt(obsWebsocketConfig.ServerPort),
+                    password: obsWebsocketConfig.ServerPassword
+                }
+            } catch(e) {
+                throw new Error(`Failed to get OBS connection settings from ${obsConfigPath}, error: ${e}`)
+            }
+        })
+
         try {
-            await obs.connect(`ws://${config.obs.ip}:${config.obs.port}`, config.obs.password)
+            await obs.connect(`ws://${connectionSettings.ip}:${connectionSettings.port}`, connectionSettings.password)
         } catch(e) {
             console.error('Failed to connect to OBS')
             throw e
