@@ -37,7 +37,7 @@ const ciServerVersionRegex = /LogShooter: Display: CI server version: (?<version
 const branchRegex = /LogShooter: Display: Branch: (?<branch>.+)/
 const changeListRegex = /LogShooter: Display: Changelist: (?<changelist>.+)/
 const buildVersionRegex = /LogShooter: Display: Build version: (?<buildVersion>.+)/
-const sessionAPICallRegex = /\[GET https:\/\/glz-(?<region>.+?)-1.(?<shard>.+?).a.pvp.net\/session\/v1\/sessions\/(?<puuid>.+?)\/reconnect\]/
+const sessionAPICallRegex = /\[GET https:\/\/glz-(?<region>.+?)-1.(?<shard>.+?).a.pvp.net\/session\/v1\/sessions\/(?<puuid>.+?)\/reconnect]/
 
 const localAgent = new https.Agent({
     rejectUnauthorized: false
@@ -330,7 +330,7 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
      * Makes an API request to a "glz" endpoint. Requires lockfile data to populate credentials
      * @param path The path to request
      * @param region Region for the endpoint domain
-     * @param region Shard for the endpoint domain
+     * @param shard Shard for the endpoint domain
      * @param extraHeaders Object with extra headers to add to the request
      */
     async requestRemoteGLZ<T>(path: string, region: string, shard: string, extraHeaders: object = {}): Promise<T> {

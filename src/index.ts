@@ -8,7 +8,7 @@ import {
     ValorantExternalSessionsResponse, ValorantMatchData,
     ValorantWebsocketEvent
 } from './valorantTypes'
-import {Config, loadConfig} from './config.js'
+import {loadConfig} from './config.js'
 import {WebSocket} from 'ws'
 import {promises as fs} from 'node:fs'
 import path from 'node:path'
