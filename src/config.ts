@@ -12,7 +12,6 @@ export interface Config {
     data: {
         enable: boolean
         path: string
-        region: string
     }
 }
 
@@ -26,9 +25,8 @@ const defaultConfig: Config = {
         renameTemplate: '{{directory}}/{{original-name}} {{queue}} {{map}} {{score}}{{extension}}'
     },
     data: {
-        enable: true,
-        path: 'data',
-        region: 'na'
+        enable: false,
+        path: 'valorant-game-data'
     }
 }
 

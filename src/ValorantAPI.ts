@@ -330,19 +330,20 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
      * Makes an API request to a "glz" endpoint. Requires lockfile data to populate credentials
      * @param path The path to request
      * @param region Region for the endpoint domain
+     * @param region Shard for the endpoint domain
      * @param extraHeaders Object with extra headers to add to the request
      */
-    async requestRemoteGLZ<T>(path: string, region: string, extraHeaders: object = {}): Promise<T> {
-        return this.requestWithAuth(`https://glz-${region}-1.${region}.a.pvp.net/${path}`, extraHeaders)
+    async requestRemoteGLZ<T>(path: string, region: string, shard: string, extraHeaders: object = {}): Promise<T> {
+        return this.requestWithAuth(`https://glz-${region}-1.${shard}.a.pvp.net/${path}`, extraHeaders)
     }
 
     /**
      * Makes an API request to a "pd" endpoint. Requires lockfile data to populate credentials
      * @param path The path to request
-     * @param region Region for the endpoint domain
+     * @param shard Shard for the endpoint domain
      * @param extraHeaders Object with extra headers to add to the request
      */
-    async requestRemotePD<T>(path: string, region: string, extraHeaders: object = {}): Promise<T> {
-        return this.requestWithAuth(`https://pd.${region}.a.pvp.net/${path}`, extraHeaders)
+    async requestRemotePD<T>(path: string, shard: string, extraHeaders: object = {}): Promise<T> {
+        return this.requestWithAuth(`https://pd.${shard}.a.pvp.net/${path}`, extraHeaders)
     }
 }
