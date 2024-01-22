@@ -13,6 +13,7 @@ import {
 } from './valorantTypes'
 import {ValorantCredentialManager} from "./ValorantCredentialManager.js";
 import {Tail} from 'tail'
+import {run} from './util/run.js'
 
 export interface ValorantAPIEvents {
     ready(lockfileData: LockfileData,
@@ -292,8 +293,20 @@ export class ValorantAPI extends EE<ValorantAPIEvents> {
             if(readLog) {
                 const logData = await fs.promises.readFile(path.join(process.env['LOCALAPPDATA']!, '/VALORANT/Saved/Logs/ShooterGame.log'), 'utf-8')
                 if(signal?.aborted) return
-                for(const line of logData.split(/\r?\n/)) {
-                    localInitializationLogListener(line)
+                const lines = logData.split(/\r?\n/)
+                const lastNonEmptyLine = run(() => {
+                    for(let i = lines.length - 1; i >= 0; i--) {
+                        if(lines[i].length > 0) return lines[i]
+                    }
+                    return undefined
+                })
+
+                // Check for a stale log from a previous launch (last non-empty line includes "Log file closed")
+                if(!(lastNonEmptyLine !== undefined && lastNonEmptyLine.includes('Log file closed'))) {
+                    // Not stale
+                    for(const line of lines) {
+                        localInitializationLogListener(line)
+                    }
                 }
             }
         })
