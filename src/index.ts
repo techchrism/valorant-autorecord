@@ -1,4 +1,4 @@
-import OBSWebSocket from 'obs-websocket-js'
+import OBSWebSocket, {OBSWebSocketError} from 'obs-websocket-js'
 import {ValorantAPI} from './ValorantAPI.js'
 import {
     CoregameMatchData,
@@ -8,7 +8,7 @@ import {
     ValorantExternalSessionsResponse, ValorantMatchData,
     ValorantWebsocketEvent
 } from './valorantTypes'
-import {Config, loadConfig} from './config.js'
+import {Config, ConnectionSettings, loadConfig} from './config.js'
 import {WebSocket} from 'ws'
 import {promises as fs} from 'node:fs'
 import path from 'node:path'
@@ -35,6 +35,7 @@ const preGamePrefix = '/riot-messaging-service/v1/message/ares-pregame/pregame/v
 const gameEndURI = '/riot-messaging-service/v1/message/ares-match-details/match-details/v1/matches'
 const clientPlatform = 'ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9'
 const requestDelay = 5 * 1000
+const authenticationConnectionError = 4009
 
 let gameVersion: string | null = null
 let mapData: MapDataResponse | null = null
@@ -79,13 +80,32 @@ async function loadPlayerData(val: ValorantAPI, dataDir: string, puuids: string[
     }
 }
 
+async function waitForOBS(connectionSettings: ConnectionSettings): Promise<OBSWebSocket> {
+    const obs = new OBSWebSocket()
+    console.log('ℹ️ Connecting to OBS...')
+    while(true) {
+        try {
+            await obs.connect(`ws://${connectionSettings.ip}:${connectionSettings.port}`, connectionSettings.password)
+            break
+        } catch(e: any) {
+            if(e instanceof OBSWebSocketError && e.code === authenticationConnectionError) {
+                throw new Error(`Failed to connect to OBS: ${e}`)
+            }
+            await asyncTimeout(1000)
+        }
+    }
+    console.log('✅ Connected to OBS')
+    return obs
+}
+
 async function main() {
     const config = await loadConfig()
 
     // Try connecting to OBS
-    const obs = new OBSWebSocket()
-    if(config.obs.enable) {
-        const connectionSettings = await run(async (): Promise<Exclude<Config['obs']['connection'], undefined>> => {
+    const obs = await run(async (): Promise<OBSWebSocket | undefined> => {
+        if(!config.obs.enable) return undefined
+
+        const connectionSettings = await run(async (): Promise<ConnectionSettings> => {
             // If the connection settings are manually specified, use them
             if(config.obs.connection !== undefined) return config.obs.connection
 
@@ -99,6 +119,10 @@ async function main() {
                     ServerPassword: string
                 }
 
+                if(!obsWebsocketConfig.ServerEnabled) {
+                    console.log('\n⚠️ OBS WebSocket server is not enabled!\n\n\tTo enable it, go to Tools > WebSockets Server Settings\n\tand check "Enable WebSocket server" then click "OK"\n')
+                }
+
                 return {
                     ip: '127.0.0.1',
                     port: parseInt(obsWebsocketConfig.ServerPort),
@@ -109,22 +133,17 @@ async function main() {
             }
         })
 
-        try {
-            await obs.connect(`ws://${connectionSettings.ip}:${connectionSettings.port}`, connectionSettings.password)
-        } catch(e) {
-            console.error('Failed to connect to OBS')
-            throw e
-        }
-    }
+        return await waitForOBS(connectionSettings)
+    })
 
     // Set up Valorant API
     const val = new ValorantAPI()
     val.on('ready', async (lockfileData: LockfileData,
                            chatSession: ValorantChatSessionResponse,
                            externalSessions: ValorantExternalSessionsResponse) => {
-        console.log('Waiting for game readiness...')
+        console.log('ℹ️ Waiting for game readiness...')
         const initData = await val.waitForInit(true)
-        console.log('Game ready!')
+        console.log('✅ Game ready!\n')
 
         const help = await val.getHelp()
         console.log(`Loaded ${Object.keys(help.events).length} events, waiting for game...`)
@@ -164,7 +183,7 @@ async function main() {
                         console.log(`Game ${gameID} ended!`)
 
                         let outputPath: string | null = null
-                        if(config.obs.enable) {
+                        if(obs !== undefined) {
                             const response = (await obs.call('StopRecord')) as unknown as StopRecordResponse
                             outputPath = response.outputPath
                         }
@@ -225,7 +244,7 @@ async function main() {
                             // Game start
                             console.log(`Game ${gameID} started!`)
 
-                            if(preGameID === null && config.obs.enable) {
+                            if(preGameID === null && obs !== undefined) {
                                 await obs.call('StartRecord')
                             }
 
@@ -261,7 +280,7 @@ async function main() {
                         websocketEvents = []
 
                         // Start OBS recording
-                        if(config.obs.enable) {
+                        if(obs !== undefined) {
                             await obs.call('StartRecord')
                         }
 
@@ -284,10 +303,11 @@ async function main() {
             }
         })
     })
+
     try {
         await val.checkLockfile()
     } catch(ignored) {
-        console.log('Waiting for Valorant to start...')
+        console.log('ℹ️ Waiting for Valorant to start...')
     }
 }
 

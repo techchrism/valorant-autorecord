@@ -1,13 +1,15 @@
 import {promises as fs} from 'node:fs'
 
+export interface ConnectionSettings {
+    ip: string
+    port: number
+    password: string
+}
+
 export interface Config {
     obs: {
         enable: boolean
-        connection?: {
-            ip: string
-            port: number
-            password: string
-        }
+        connection?: ConnectionSettings
         renameFile: boolean
         renameTemplate: string
     }
