@@ -1,6 +1,7 @@
 import OBSWebSocket, {OBSWebSocketError} from 'obs-websocket-js'
 import {ValorantAPI} from './ValorantAPI.js'
 import {
+    AgentDataResponse,
     CoregameMatchData,
     LockfileData, MapDataResponse, PregameMatchData, PrivatePresence,
     ValorantChatSessionResponse,
@@ -39,6 +40,7 @@ const authenticationConnectionError = 4009
 
 let gameVersion: string | null = null
 let mapData: MapDataResponse | null = null
+let agentData: AgentDataResponse | null = null
 
 let gameID: string | null = null
 let preGameID: string | null = null
@@ -197,6 +199,9 @@ async function main() {
                             if(mapData === null) {
                                 mapData = (await (await fetch('https://valorant-api.com/v1/maps')).json()) as MapDataResponse
                             }
+                            if(agentData === null) {
+                                agentData = (await (await fetch('https://valorant-api.com/v1/agents')).json()) as AgentDataResponse
+                            }
                             let score = ''
                             const ownPlayer = matchData.players.find(player => player.subject === chatSession.puuid)
                             if(ownPlayer !== undefined && matchData.teams !== null) {
@@ -217,6 +222,7 @@ async function main() {
                                 extension,
                                 'original-name': path.basename(outputPath, extension),
                                 map: mapData.data.find(map => map.mapUrl === matchData.matchInfo.mapId)?.displayName || '',
+                                agent: agentData.data.find(agent => agent.uuid === ownPlayer?.characterId)?.displayName || '',
                                 queue: matchData.matchInfo.queueID,
                                 score
                             })

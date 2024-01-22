@@ -152,6 +152,7 @@ export interface ValorantMatchData {
     players: {
         subject: string
         teamId: string
+        characterId: string
     }[]
     teams: {
         teamId: string
@@ -165,5 +166,12 @@ export interface MapDataResponse {
     data: {
         displayName: string
         mapUrl: string
+    }[]
+}
+
+export interface AgentDataResponse {
+    data: {
+        uuid: string
+        displayName: string
     }[]
 }
